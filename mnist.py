@@ -59,8 +59,8 @@ def get_prediction(img, flags_obj):
     # Load the datasets
     # train_ds = mnist_dataset.train(flags_obj.data_dir).shuffle(60000).batch(
     #     flags_obj.batch_size)
-    test_ds = mnist_dataset.test(flags_obj.data_dir).batch(
-        flags_obj.batch_size)
+    # test_ds = mnist_dataset.test(flags_obj.data_dir).batch(
+    #     flags_obj.batch_size)
 
     # Create the model and optimizer
     model = mnist.create_model(data_format)
