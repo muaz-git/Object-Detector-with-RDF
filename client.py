@@ -8,6 +8,10 @@ import tensorflow as tf
 import cv2
 import numpy as np
 from absl import flags
+import sys
+
+sys.path.append(
+    r'C:\\Users\\mumu01\\AppData\\Local\\Continuum\\miniconda2\\envs\\python361envgpu\\Lib\\site-packages\\tensorflow\\models')
 from mnist import get_prediction
 
 import os
@@ -18,28 +22,41 @@ from absl import app as absl_app
 
 from tensorflow.python import eager as tfe
 # pylint: enable=g-bad-import-order
-
-from official.mnist import dataset as mnist_dataset
-from official.mnist import mnist
 from official.utils.flags import core as flags_core
-from official.utils.misc import model_helpers
 import cv2
 import numpy as np
 
+from rdflib import URIRef, BNode, Literal, Graph
 
-def send_msg(rdf_json):
-    URL = "http://localhost:8080/greeting"
-    my_json = {"a": "1"}
-    PARAMS = {'json': json.dumps(my_json)}
-    r = requests.get(url=URL, params=PARAMS)
+f_name = 'output.xml'
+url = 'http://localhost:8080/greeting'
+
+
+def send_msg():
+    files = {'file': open(f_name, 'rb')}
+    r = requests.post(url, files=files)
+
+    # URL = "http://localhost:8080/greeting"
+    # my_json = {"a": "1"}
+    # PARAMS = {'json': json.dumps(my_json)}
+    # r = requests.get(url=URL, params=PARAMS)
 
     data = r.json()
     print("Got some results : ", data)
 
 
-def convert_results_to_rdfJson(rslts):
-    # converts the results:rslts to rdf/json format.
-    return None
+def save_as_rdfxml(rslts):
+    # saves the results:rslts to xml file.
+    g = Graph()
+    hst = "http://localhost/"
+    img_name = hst+rslts["img_name"]
+    pred = URIRef(img_name + '/pred')
+    uri = URIRef(img_name)
+    val = URIRef(hst+str(rslts['cls']))
+
+    g.add((uri, pred, val))
+
+    g.serialize(destination=f_name, format='xml')
 
 
 def define_mnist_eager_flags():
@@ -80,7 +97,7 @@ def process_image(img, flags_obj):
     # returns the results
 
     cls, prob = get_prediction(img, flags_obj)
-    rslts = {"cls":cls, "prob":prob}
+    rslts = {"cls": cls, "prob": prob}
     return rslts
 
 
@@ -90,7 +107,7 @@ def main(_):
     # call process_image(img) and fetch results:rslts of a NN.
     # convert results in to rdf_json by calling function convert_results_to_rdfJson(rslts)
     # send it to server by calling send_msg(rdf_json)
-    img_name = './example5.png'
+    img_name = 'example3.png'
     img = cv2.imread(img_name, 0)
     img = img.flatten() / 255.0
     img = np.expand_dims(img, axis=0)
@@ -98,12 +115,12 @@ def main(_):
 
     rslts = process_image(img, flags.FLAGS)
     rslts["img_name"] = img_name
-    rdf_json = convert_results_to_rdfJson(rslts)
-    # send_msg(rdf_json)
+    print(rslts)
+    save_as_rdfxml(rslts)
+    send_msg()
 
 
 if __name__ == '__main__':
     tf.enable_eager_execution()
     define_mnist_eager_flags()
     absl_app.run(main=main)
-
