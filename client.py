@@ -3,58 +3,73 @@ from __future__ import division
 from __future__ import print_function
 
 import requests
-import json
+import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 import tensorflow as tf
-import cv2
-import numpy as np
 from absl import flags
 import sys
+from rdflib.namespace import DC, FOAF
 
-sys.path.append(
-    r'C:\\Users\\mumu01\\AppData\\Local\\Continuum\\miniconda2\\envs\\python361envgpu\\Lib\\site-packages\\tensorflow\\models')
+tensorflow_path = r'C:\\Users\\mumu01\\AppData\\Local\\Continuum\\miniconda2\\envs\\python361envgpu\\Lib\\site-packages\\tensorflow'
+mdls_path = tensorflow_path + '\\models'
+
+if not os.path.isdir(mdls_path):
+    print(
+        "To run this code successfully please copy 'models' folder in your tensorflow_path directory. It can be downloaded from https://github.com/tensorflow/models")
+    print("tensorflow_path is relative to user's system, so please change the variable:tensorflow_path accordingly")
+    exit()
+
+sys.path.append(mdls_path)
 from mnist import get_prediction
-
-import os
-import time
-
-# pylint: disable=g-bad-import-order
 from absl import app as absl_app
 
-from tensorflow.python import eager as tfe
-# pylint: enable=g-bad-import-order
 from official.utils.flags import core as flags_core
 import cv2
 import numpy as np
+import uuid
+from rdflib import URIRef, Literal, Graph
 
-from rdflib import URIRef, BNode, Literal, Graph
+import shutil
 
-f_name = 'output.xml'
+tmp_dir = './tmp/'
+if os.path.isdir(tmp_dir):
+    shutil.rmtree(tmp_dir)
+
+if not os.path.exists(tmp_dir):
+    os.makedirs(tmp_dir)
+
+f_name = tmp_dir + str(uuid.uuid4())
 url = 'http://localhost:8080/greeting'
+
+mnist_saved_model = '../mnist_model'
+
+print("\n\n\tPlease make sure that pre-trained model is saved in directory: " + mnist_saved_model)
 
 
 def send_msg():
     files = {'file': open(f_name, 'rb')}
     r = requests.post(url, files=files)
 
-    # URL = "http://localhost:8080/greeting"
-    # my_json = {"a": "1"}
-    # PARAMS = {'json': json.dumps(my_json)}
-    # r = requests.get(url=URL, params=PARAMS)
-
     data = r.json()
-    print("Got some results : ", data)
 
 
 def save_as_rdfxml(rslts):
     # saves the results:rslts to xml file.
     g = Graph()
-    hst = "http://localhost/"
-    img_name = hst+rslts["img_name"]
-    pred = URIRef(img_name + '/pred')
-    uri = URIRef(img_name)
-    val = URIRef(hst+str(rslts['cls']))
 
-    g.add((uri, pred, val))
+    hst = "http://example.org/"
+    img_dest = URIRef(hst + rslts["img_name"])
+
+    # img_name = hst+rslts["img_name"]
+    # pred = URIRef(img_name + '/pred')
+    # uri = URIRef(img_name)
+    # val = URIRef(hst+str(rslts['cls']))
+
+    g.add((img_dest, FOAF.pred, Literal(rslts['cls'])))
+
+    # g.add((uri, pred, val))
 
     g.serialize(destination=f_name, format='xml')
 
@@ -85,7 +100,7 @@ def define_mnist_eager_flags():
 
     flags_core.set_defaults(
         data_dir='/tmp/tensorflow/mnist/input_data',
-        model_dir='../mnist_model',
+        model_dir=mnist_saved_model,
         batch_size=100,
         train_epochs=10,
     )
@@ -103,24 +118,33 @@ def process_image(img, flags_obj):
 
 def main(_):
     # take name of input image.
+    img_name = input("\n\nEnter path to image: ")
+    if not os.path.exists(img_name):
+        img_name = 'example3.png'
+        print("\n\tPath does not exist. Loading default file i.e. " + img_name)
+
+    print("\nLoading " + img_name)
+    # exit()
+
     # reads the image: img
-    # call process_image(img) and fetch results:rslts of a NN.
-    # convert results in to rdf_json by calling function convert_results_to_rdfJson(rslts)
-    # send it to server by calling send_msg(rdf_json)
-    img_name = 'example3.png'
+
     img = cv2.imread(img_name, 0)
+    # preprocessing for the model.
+
     img = img.flatten() / 255.0
     img = np.expand_dims(img, axis=0)
     img = tf.convert_to_tensor(img, dtype=tf.float32)
 
+    # call process_image(img) and fetch results:rslts of a NN.
     rslts = process_image(img, flags.FLAGS)
     rslts["img_name"] = img_name
-    print(rslts)
+    # convert results in to rdf_xml by calling function save_as_rdfxml(rslts)
     save_as_rdfxml(rslts)
+    # send it to server by calling send_msg(rdf_json)
     send_msg()
 
 
 if __name__ == '__main__':
-    tf.enable_eager_execution()
+    tf.compat.v1.enable_eager_execution()
     define_mnist_eager_flags()
     absl_app.run(main=main)
