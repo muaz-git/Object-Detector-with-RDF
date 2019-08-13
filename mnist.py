@@ -30,7 +30,6 @@ import os
 
 import tensorflow as tf
 
-from official.mnist import dataset as mnist_dataset
 from official.mnist import mnist
 from official.utils.misc import model_helpers
 
